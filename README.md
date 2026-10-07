@@ -85,7 +85,7 @@ bin/ssh-remote-exec.sh --check-only -- 'rm -rf /tmp/x'   # => BLOCK:FILES
 SSH_REMOTE_DANGER_FILES=allow bin/ssh-remote-exec.sh --check-only -- 'rm -rf /tmp/x'  # => ALLOW
 ```
 
-**🧪 `SAFE_MODE=1` (testing phase)**: `remote_bash` only allows read-only/diagnostic commands (`echo`, `ls`, `cat`, `grep`/`rg`, `find` without `-delete`, `git status/diff/log`, `--version`, `df/du/free`…) validated **per segment** (`;`, `&&`, `||`, `|`), and writes only land in `/tmp/` and your `opencode-safe-test/` dir.
+**🧪 `SAFE_MODE=1` (testing phase)**: `remote_bash` allows diagnostic + dev commands (`echo`, `ls`, `cat`, `grep`/`rg`/`jq`/`diff`/`sort`, `curl`, `git status/diff/log/fetch/pull/clone/push` with `-C` support, `python3`/`node`/`bash` script *files* (never `-c`), `flutter`/`dart`, `--version`, `df/du/free`, `timeout`/`ps`…) validated **per segment** (`;`, `&&`, `||`, `|`), and writes only land in `/tmp/` and your `opencode-safe-test/` dir. Destructive classes still deny by default (`rm`, `reset --hard`, `push --force`, editors…).
 
 ---
 

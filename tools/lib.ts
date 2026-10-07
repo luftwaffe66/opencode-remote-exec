@@ -34,7 +34,7 @@ export const DANGER_CLASSES: Record<string, RegExp[]> = {
   SYSTEM: [/\bshutdown\b/i, /\breboot\b/i, /\bhalt\b/i, /\bpoweroff\b/i, /\binit\s+[06]\b/, /\bsystemctl\s+(stop|disable|mask|poweroff|reboot)\b/i, /\bservice\s+\w+\s+stop\b/i, /\bkill\s+-9\s+1\b/, /\bpkill\b.*(init|systemd|sshd)/i],
   NETWORK: [/\biptables\b/i, /\bnft\s/i],
   CONTAINERS: [/\bdocker\s+(rm|rmi|prune|system)\b/i, /\bpodman\b.*\bprune\b/i],
-  GIT: [/\bgit\s+push\b.*--force/i, /\bgit\s+reset\s+--hard\b/i, /\bgit\s+clean\s+-f\b/i, /\bgit\s+branch\s+-D\b/],
+  GIT: [/\bgit(?:\s+-[Cc]\s+(?:"[^"]*"|'[^']*'|\S+))*\s+push\b.*--force/i, /\bgit(?:\s+-[Cc]\s+(?:"[^"]*"|'[^']*'|\S+))*\s+reset\s+--hard\b/i, /\bgit(?:\s+-[Cc]\s+(?:"[^"]*"|'[^']*'|\S+))*\s+clean\s+-f\b/i, /\bgit(?:\s+-[Cc]\s+(?:"[^"]*"|'[^']*'|\S+))*\s+branch\s+-D\b/],
   DATA: [/\bdropdb\b/i, /\bdrop\s+database\b/i, /\btruncate\b/i, /\bdelete\s+from\b/i],
   CLOUD: [/\bterraform\s+destroy\b/i, /\bkubectl\s+delete\b/i, /\bhelm\s+uninstall\b/i, /\baws\s+s3\s+rm\b/i, /\bgcloud\b.*\bdelete\b/i, /\baz\b.*\bdelete\b/i],
   PERMS: [/\bchmod\s+-R\s+777\s+\//, /\bchown\s+-R\b.*\/\s*$/i, /\buserdel\b/i, /\bgroupdel\b/i, /\bpasswd\s+-d\b/i],
@@ -63,7 +63,7 @@ export function checkBash(cmd: string): { verdict: "allow" | "block"; classes: s
 }
 
 const SAFE_BASH_ALLOW =
-  /^(echo|printf|pwd|whoami|hostname|who|id|uname|date|uptime|ls|cat|head|tail|wc|file|stat|realpath|basename|dirname|git\s+(status|diff|log|branch|remote|rev-parse|--version)|node\s+--version|npm\s+--version|python3?\s+--version|[a-zA-Z0-9_.-]+\s+--version|rg\s|grep\s|find\s|fd\s|lsb_release|df\s|du\s|free\s|which\s|env\s)/;
+  /^(echo|printf|pwd|whoami|hostname|who|id|uname|date|uptime|ls|cat|head|tail|wc|file|stat|realpath|basename|dirname|git\s+(status|diff|log|branch|remote|rev-parse|ls-remote|ls-files|show|stash|tag|grep|blame|fetch|pull|clone|push|--version)|node\s+(--version|[^-])|npm\s+(--version|[^-])|python3?\s+(--version|[^-])|(bash|sh)\s+[^-]|\S+\s+--version|rg\s|grep\s|find\s|fd\s|lsb_release|df\s|du\s|free\s|which\s|env\s|jq\s|diff\s|sort\s|uniq\s|tr\s|cut\s|column\s|curl\s|wget\s+--spider\s|(\S*\/)?flutter\s|(\S*\/)?dart\s|go\s+version|timeout\s|sleep\s|ps(\s|$)|pgrep\s|dig\s|nslookup\s)/;
 
 const SAFE_WRITE_PREFIXES = ["/tmp/", `/home/${REMOTE_USER}/opencode-safe-test/`, `/home/${REMOTE_USER}/tmp/`];
 
@@ -79,8 +79,13 @@ export function assertSafeBash(cmd: string) {
     for (let seg of segs) {
       seg = seg
         .replace(/^sudo\s+/, "")
+        .replace(/^export\s+/, "")
         .replace(/^[A-Za-z_][A-Za-z0-9_]*=("[^"]*"|'[^']*'|\S+)\s+/, "")
+        .replace(/^[A-Za-z_][A-Za-z0-9_]*=("[^"]*"|'[^']*'|\S+)$/, "")
         .replace(/^cd\s+[^;]+/, "")
+        // git global flags don't change the verb: workdir travels separately
+        .replace(/^git\s+-C\s+("[^"]*"|'[^']*'|\S+)\s+/, "git ")
+        .replace(/^git\s+-c\s+\S+\s+/, "git ")
         .trim();
       if (!seg) continue;
       if (!SAFE_BASH_ALLOW.test(seg))

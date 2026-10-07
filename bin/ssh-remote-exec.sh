@@ -44,6 +44,10 @@ if [[ -z "${CMD:-}" ]]; then
   exit 2
 fi
 
+# Normalize once for policy checks: collapse `git -C <dir>` / `git -c k=v`
+# global flags (workdir travels separately). Raw $CMD still runs/shows.
+CHECK_CMD="$(printf '%s' "$CMD" | sed -E 's/git[[:space:]]+-C[[:space:]]+"[^"]*"/git/g; s/git[[:space:]]+-C[[:space:]]+[^[:space:];|&]+/git/g; s/git[[:space:]]+-c[[:space:]]+[^[:space:];|&]+/git/g')"
+
 # ── LAYER 1: granular danger policy ──
 # 11 classes, deny by default. Configure in conf: DANGER_<CLASS>=deny|allow,
 # or in env: SSH_REMOTE_DANGER_<CLASS>=deny|allow (env wins).
@@ -78,11 +82,11 @@ danger_value() { # $1=CLASS -> deny|allow (env, then conf, then deny)
 HIT_CLASS=""
 for cls in $CLASSES; do
   if [[ "$(danger_value "$cls")" == "allow" ]]; then continue; fi
-  if printf '%s' "$CMD" | grep -Ei -q "$(danger_pattern "$cls")"; then HIT_CLASS="$cls"; break; fi
+  if printf '%s' "$CHECK_CMD" | grep -Ei -q "$(danger_pattern "$cls")"; then HIT_CLASS="$cls"; break; fi
 done
 EXTRA_PAT="${SSH_REMOTE_DANGER_EXTRA:-${DANGER_EXTRA:-}}"
 if [[ -z "$HIT_CLASS" && -n "$EXTRA_PAT" ]]; then
-  if printf '%s' "$CMD" | grep -Ei -q "$EXTRA_PAT"; then HIT_CLASS="EXTRA"; fi
+  if printf '%s' "$CHECK_CMD" | grep -Ei -q "$EXTRA_PAT"; then HIT_CLASS="EXTRA"; fi
 fi
 if [[ -n "$HIT_CLASS" ]]; then
   if [[ "$CHECK_ONLY" == "1" ]]; then echo "BLOCK:$HIT_CLASS"; exit 3; fi
@@ -93,12 +97,12 @@ fi
 
 # ── LAYER 2: safe-mode allowlist (validates EACH segment split by ; && || |) ──
 if [[ "$SAFE_MODE" == "1" ]]; then
-  SAFE_SEG='^(echo|printf|pwd|whoami|hostname|who|id|uname|date|uptime|ls|cat|head|tail|wc|file|stat|realpath|basename|dirname|git +(status|diff|log|branch|remote|rev-parse|--version)|node +--version|npm +--version|python3? +--version|[a-zA-Z0-9_.-]+ +--version|rg +|grep +|find +|fd +|lsb_release|df +|du +|free +|which +|env +)'
+  SAFE_SEG='^(echo|printf|pwd|whoami|hostname|who|id|uname|date|uptime|ls|cat|head|tail|wc|file|stat|realpath|basename|dirname|git +(status|diff|log|branch|remote|rev-parse|ls-remote|ls-files|show|stash|tag|grep|blame|fetch|pull|clone|push|--version)|node +(--version|[^-])|npm +(--version|[^-])|python3? +(--version|[^-])|(bash|sh) +[^-]|[^[:space:]]+[[:space:]]+--version|rg +|grep +|find +|fd +|lsb_release|df +|du +|free +|which +|env +|jq +|diff +|sort +|uniq +|tr +|cut +|column +|curl +|flutter +|dart +|([^[:space:]]*/)?flutter +|([^[:space:]]*/)?dart +|go +version|timeout +|sleep +|ps([[:space:]]|$)|pgrep +|dig +|nslookup +)'
   # Normalize separators to newlines and validate segment by segment
-  SEGMENTS="$(printf '%s' "$CMD" | sed -E 's/\|\|/\n/g; s/&&/\n/g; s/;/\n/g; s/\|/\n/g')"
+  SEGMENTS="$(printf '%s' "$CHECK_CMD" | sed -E 's/\|\|/\n/g; s/&&/\n/g; s/;/\n/g; s/\|/\n/g')"
   REJECTED=""
   while IFS= read -r seg; do
-    CORE="$(printf '%s' "$seg" | sed -E 's/^[[:space:]]*//; s/^sudo[[:space:]]+//; s/^[a-zA-Z0-9_]+=("[^"]*"|'"'"'[^'"'"']*'"'"'|[^[:space:];]+)[[:space:]]+//; s/^[[:space:]]*cd [^;]+//; s/^[[:space:]]*//')"
+    CORE="$(printf '%s' "$seg" | sed -E 's/^[[:space:]]*//; s/^sudo[[:space:]]+//; s/^export[[:space:]]+//; s/^[a-zA-Z0-9_]+=("[^"]*"|'"'"'[^'"'"']*'"'"'|[^[:space:];]+)[[:space:]]+//; s/^[a-zA-Z0-9_]+=("[^"]*"|'"'"'[^'"'"']*'"'"'|[^[:space:];]+)$//; s/^[[:space:]]*cd [^;]+//; s/^[[:space:]]*//')"
     [[ -z "$CORE" ]] && continue
     if ! printf '%s' "$CORE" | grep -Eq "$SAFE_SEG"; then
       REJECTED="$seg"
@@ -109,7 +113,7 @@ if [[ "$SAFE_MODE" == "1" ]]; then
     if [[ "$CHECK_ONLY" == "1" ]]; then echo "BLOCK:SAFE_MODE"; exit 4; fi
     echo "⛔ SAFE_MODE=1: read-only/diagnostic commands only in testing." >&2
     echo "   Rejected command: $CMD" >&2
-    echo "   Allowed: echo, pwd, whoami, ls, cat, head, tail, wc, grep/rg, find (no -delete), git status/diff/log, --version, df/du/free." >&2
+    echo "   Allowed: echo/ls/cat/head/tail, grep/rg/jq/diff/sort, git status/diff/log/fetch/pull/clone (+ -C), python3/node/bash script files (no -c), curl, flutter/dart, --version, df/du/free, timeout/sleep/ps." >&2
     echo "   For writes use remote_write into $SAFE_WRITE_PREFIXES" >&2
     exit 4
   fi

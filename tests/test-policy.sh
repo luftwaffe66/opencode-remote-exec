@@ -61,6 +61,27 @@ got=$(bash "$EXEC" --check-only -- 'echo hello')
 got=$(bash "$EXEC" --check-only -- 'vim file.txt')
 [[ "$got" == "BLOCK:SAFE_MODE" ]] && ok "SAFE_MODE blocks vim" || bad "SAFE_MODE vim" "got $got"
 
+echo "== 5. SAFE_MODE friendly extensions (still SAFE_MODE=1) =="
+safe_expect() { # $1=label $2=expected, $3=probe
+  local got
+  got=$(bash "$EXEC" --check-only -- "$3")
+  if [[ "$got" == "$2" ]]; then ok "$1 => $got"; else bad "$1" "want $2, got $got"; fi
+}
+safe_expect "git -C flag stripped" "ALLOW" 'git -C ~/presti status'
+safe_expect "git -C cannot smuggle reset" "BLOCK:GIT" 'git -C ~/presti reset --hard'
+safe_expect "git fetch allowed" "ALLOW" 'git fetch origin main'
+safe_expect "git push still needs care" "ALLOW" 'git push origin main'
+safe_expect "python3 script file allowed" "ALLOW" 'python3 /tmp/opencode-safe-test/keydiff.py'
+safe_expect "python3 -c blocked" "BLOCK:SAFE_MODE" 'python3 -c "import os"'
+safe_expect "jq allowed" "ALLOW" 'jq length assets/strings/es.json'
+safe_expect "diff allowed" "ALLOW" 'diff a.txt b.txt'
+safe_expect "curl allowed" "ALLOW" 'curl -s https://example.com/x'
+safe_expect "dart test allowed" "ALLOW" 'dart test test/a_test.dart'
+safe_expect "flutter allowed" "ALLOW" 'flutter --version'
+safe_expect "flutter by path allowed" "ALLOW" '~/flutter/bin/flutter --version'
+safe_expect "export PATH then flutter" "ALLOW" 'export PATH="$HOME/flutter/bin:$PATH"; flutter --version'
+safe_expect "timeout allowed" "ALLOW" 'timeout 10 flutter --version'
+
 echo ""
 echo "== RESULT: $PASS passed, $FAIL failed =="
 [ "$FAIL" -eq 0 ]
