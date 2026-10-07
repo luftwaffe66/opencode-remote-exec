@@ -1,4 +1,4 @@
-# 🚀 opencode-ssh-tools
+# 🚀 opencode-remote-exec
 
 > **Remote Execution Layer over SSH for OpenCode** — OpenCode runs on your local machine, all the heavy lifting happens on your servers.
 
@@ -80,8 +80,8 @@ Two independent layers — TypeScript (`tools/lib.ts`) and Bash (`bin/ssh-remote
 ## 📦 Installation
 
 ```bash
-git clone https://github.com/luftwaffe66/opencode-ssh-tools.git
-cd opencode-ssh-tools
+git clone https://github.com/luftwaffe66/opencode-remote-exec.git
+cd opencode-remote-exec
 bash bin/install.sh
 ```
 
