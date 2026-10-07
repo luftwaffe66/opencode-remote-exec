@@ -1,0 +1,9 @@
+# Config real con TUS datos (instalador la crea desde .example). JAMÁS se sube al repo.
+config/ssh-remote.conf
+
+# Memoria local y notas personales
+memory/
+
+# Logs y sockets SSH
+*.log
+.ssh-cm-*

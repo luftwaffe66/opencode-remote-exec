@@ -1,0 +1,30 @@
+# opencode-ssh-remote — configuración (PLANTILLA PÚBLICA)
+#
+# 1. Copia este archivo a ssh-remote.conf (bin/install.sh lo hace solo):
+#      cp config/ssh-remote.conf.example config/ssh-remote.conf
+# 2. Pon TUS datos. ssh-remote.conf está en .gitignore: NUNCA se sube al repo.
+#
+# Transporte: LAN (casa) o Tailscale (fuera de casa). Sin contraseña:
+# solo user+host vía llave ed25519 (ssh-copy-id una vez, luego BatchMode).
+# Selección en caliente: export SSH_REMOTE_HOST=<tu IP LAN|Tailscale>
+
+# Host principal (ej. tu IP LAN)
+: "${REMOTE_HOST:=192.168.1.10}"
+: "${REMOTE_USER:=tu_usuario}"
+: "${REMOTE_PORT:=22}"
+: "${REMOTE_WORKSPACE:=/home/tu_usuario}"
+
+# Host Tailscale (opcional, ej. tu IP 100.x.x.x). Vacío = se omite.
+: "${TAILSCALE_HOST:=}"
+: "${TAILSCALE_USER:=tu_usuario}"
+
+# SSH multiplexación (evita 1 conexión por llamada)
+: "${SSH_CONTROL_PATH:=~/.ssh/cm-%r@%h:%p}"
+: "${SSH_CONTROL_PERSIST:=600}"
+: "${SSH_CONNECT_TIMEOUT:=5}"
+
+# Seguridad fase pruebas: 1 = solo comandos seguros + writes solo en zona segura.
+# Para producción pon SAFE_MODE=0 (la blocklist destructiva sigue SIEMPRE activa).
+: "${SAFE_MODE:=1}"
+: "${SAFE_WRITE_PREFIXES:=/tmp/}"
+# Añade tu zona de proyecto, ej: /home/tu_usuario/opencode-safe-test/
