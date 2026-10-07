@@ -3,14 +3,14 @@ import { assertSafeWritePath, sshExec, q } from "./lib.ts";
 
 export default tool({
   description:
-    "Escribe (crea/sobrescribe) un archivo en el servidor remoto. SAFE_MODE=1: solo en /tmp/ y en tu dir opencode-safe-test (ver config).",
+    "Writes (creates/overwrites) a file on the remote server. SAFE_MODE=1: /tmp/ and your opencode-safe-test dir only (see config).",
   args: {
-    filePath: tool.schema.string().describe("Ruta remota destino (zona segura en pruebas)"),
-    content: tool.schema.string().describe("Contenido completo a escribir"),
+    filePath: tool.schema.string().describe("Remote destination path (safe zone while testing)"),
+    content: tool.schema.string().describe("Full content to write"),
   },
   async execute(args) {
     assertSafeWritePath(args.filePath);
-    // Transporte seguro: base64 local -> decode remoto (evita quoting). Solo mkdir -p del padre + tee.
+    // Safe transport: local base64 -> remote decode (avoids quoting). Only mkdir -p of parent + write.
     const b64 = Buffer.from(args.content, "utf8").toString("base64");
     const cmd =
       `mkdir -p $(dirname ${q(args.filePath)}) && ` +

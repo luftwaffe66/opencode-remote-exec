@@ -1,30 +1,48 @@
-# opencode-ssh-remote — configuración (PLANTILLA PÚBLICA)
+# opencode-ssh-remote — configuration (PUBLIC TEMPLATE)
 #
-# 1. Copia este archivo a ssh-remote.conf (bin/install.sh lo hace solo):
+# 1. Copy this file to ssh-remote.conf (bin/install.sh does it for you):
 #      cp config/ssh-remote.conf.example config/ssh-remote.conf
-# 2. Pon TUS datos. ssh-remote.conf está en .gitignore: NUNCA se sube al repo.
+# 2. Put YOUR data in. ssh-remote.conf is gitignored: it NEVER gets committed.
 #
-# Transporte: LAN (casa) o Tailscale (fuera de casa). Sin contraseña:
-# solo user+host vía llave ed25519 (ssh-copy-id una vez, luego BatchMode).
-# Selección en caliente: export SSH_REMOTE_HOST=<tu IP LAN|Tailscale>
+# Transport: LAN (home) or Tailscale (away). Passwordless:
+# user+host only, via ed25519 key (ssh-copy-id once, then BatchMode).
+# Hot selection: export SSH_REMOTE_HOST=<your LAN|Tailscale IP>
 
-# Host principal (ej. tu IP LAN)
+# Main host (e.g. your LAN IP)
 : "${REMOTE_HOST:=192.168.1.10}"
-: "${REMOTE_USER:=tu_usuario}"
+: "${REMOTE_USER:=your_user}"
 : "${REMOTE_PORT:=22}"
-: "${REMOTE_WORKSPACE:=/home/tu_usuario}"
+: "${REMOTE_WORKSPACE:=/home/your_user}"
 
-# Host Tailscale (opcional, ej. tu IP 100.x.x.x). Vacío = se omite.
+# Tailscale host (optional, e.g. your 100.x.x.x IP). Empty = skipped.
 : "${TAILSCALE_HOST:=}"
-: "${TAILSCALE_USER:=tu_usuario}"
+: "${TAILSCALE_USER:=your_user}"
 
-# SSH multiplexación (evita 1 conexión por llamada)
+# SSH multiplexing (avoids 1 connection per call)
 : "${SSH_CONTROL_PATH:=~/.ssh/cm-%r@%h:%p}"
 : "${SSH_CONTROL_PERSIST:=600}"
 : "${SSH_CONNECT_TIMEOUT:=5}"
 
-# Seguridad fase pruebas: 1 = solo comandos seguros + writes solo en zona segura.
-# Para producción pon SAFE_MODE=0 (la blocklist destructiva sigue SIEMPRE activa).
+# Testing-phase safety: 1 = safe commands only + writes to safe zone only.
+# For production set SAFE_MODE=0 (the danger policy below stays enforced per class).
 : "${SAFE_MODE:=1}"
 : "${SAFE_WRITE_PREFIXES:=/tmp/}"
-# Añade tu zona de proyecto, ej: /home/tu_usuario/opencode-safe-test/
+# Add your project zone, e.g.: /home/your_user/opencode-safe-test/
+
+# ── Granular danger policy: 11 classes, deny by default ──
+# Set any class to allow ONLY with explicit approval (never by default).
+# Env override wins: SSH_REMOTE_DANGER_<CLASS>=deny|allow
+# Classes: FILES DISKS SYSTEM NETWORK CONTAINERS GIT DATA CLOUD PERMS FORKBOMB SYNC
+: "${DANGER_FILES:=deny}"
+: "${DANGER_DISKS:=deny}"
+: "${DANGER_SYSTEM:=deny}"
+: "${DANGER_NETWORK:=deny}"
+: "${DANGER_CONTAINERS:=deny}"
+: "${DANGER_GIT:=deny}"
+: "${DANGER_DATA:=deny}"
+: "${DANGER_CLOUD:=deny}"
+: "${DANGER_PERMS:=deny}"
+: "${DANGER_FORKBOMB:=deny}"
+: "${DANGER_SYNC:=deny}"
+# Extra operator pattern (additional deny, ERE). Empty = off.
+: "${DANGER_EXTRA:=}"

@@ -53,25 +53,37 @@ No duplicated project copies. No SSHFS. No OpenCode server on the other side. Ev
 
 Plus the `bin/ssh-remote-exec.sh` wrapper for use outside OpenCode too. 💻
 
+> 🤖 **Driving this with an AI agent?** Send it [`instructions.md`](./instructions.md) — the exact copy-paste prompt to install, verify and operate this project.
+
 ---
 
 ## 🔐 Security by design (double guard)
 
-Two independent layers — TypeScript (`tools/lib.ts`) and Bash (`bin/ssh-remote-exec.sh`) — enforcing the same policy:
+Two independent layers — TypeScript (`tools/lib.ts`) and Bash (`bin/ssh-remote-exec.sh`) — enforcing the same policy.
 
-**⛔ Always blocked** (even with safe mode off):
+### 🎚️ Granular danger policy (11 classes, deny by default)
 
-| Category | Examples |
-|----------|----------|
-| Deletion | `rm`, `find -delete`, `find -exec rm`, `shred` |
-| Disks | `mkfs`, `dd of=/dev/*`, `fdisk`, `parted`, `>/dev/sd*` |
-| System | `shutdown`, `reboot`, `halt`, `init 0/6` |
-| Services/net | `systemctl stop/disable`, `iptables`, `nft` |
-| Containers | `docker rm/rmi/prune/system`, `podman prune` |
-| Destructive git | `push --force`, `reset --hard`, `clean -f`, `branch -D` |
-| Data | `DROP DATABASE`, `TRUNCATE`, `DELETE FROM`, `dropdb` |
-| Cloud/IaC | `terraform destroy`, `kubectl delete`, `helm uninstall` |
-| Classics | fork-bomb `:(){:|:&}`, `chmod -R 777 /`, `rsync --delete /` |
+Every dangerous command belongs to a class. Each class is **denied by default** and can be allowed individually — in config (`DANGER_<CLASS>=deny|allow`) or env (`SSH_REMOTE_DANGER_<CLASS>=deny|allow`, env wins). Plus an operator extra: `DANGER_EXTRA` / `SSH_REMOTE_DANGER_EXTRA` (additional deny regex).
+
+| Category | Class | Examples |
+|----------|-------|----------|
+| Deletion | `FILES` | `rm`, `find -delete`, `find -exec rm`, `shred` |
+| Disks | `DISKS` | `mkfs`, `dd of=/dev/*`, `fdisk`, `parted`, `>/dev/sd*` |
+| System | `SYSTEM` | `shutdown`, `reboot`, `halt`, `init 0/6` |
+| Services/net | `SYSTEM` / `NETWORK` | `systemctl stop/disable`, `iptables`, `nft` |
+| Containers | `CONTAINERS` | `docker rm/rmi/prune/system`, `podman prune` |
+| Destructive git | `GIT` | `push --force`, `reset --hard`, `clean -f`, `branch -D` |
+| Data | `DATA` | `DROP DATABASE`, `TRUNCATE`, `DELETE FROM`, `dropdb` |
+| Cloud/IaC | `CLOUD` | `terraform destroy`, `kubectl delete`, `helm uninstall` |
+| Permissions | `PERMS` | `chmod -R 777 /`, `userdel`, `passwd -d` |
+| Classics | `FORKBOMB` / `SYNC` | fork-bomb `:(){:|:&}`, `rsync --delete /` |
+
+Dry-run any command without executing it (prints `ALLOW` or `BLOCK:<CLASS>`):
+
+```bash
+bin/ssh-remote-exec.sh --check-only -- 'rm -rf /tmp/x'   # => BLOCK:FILES
+SSH_REMOTE_DANGER_FILES=allow bin/ssh-remote-exec.sh --check-only -- 'rm -rf /tmp/x'  # => ALLOW
+```
 
 **🧪 `SAFE_MODE=1` (testing phase)**: `remote_bash` only allows read-only/diagnostic commands (`echo`, `ls`, `cat`, `grep`/`rg`, `find` without `-delete`, `git status/diff/log`, `--version`, `df/du/free`…) validated **per segment** (`;`, `&&`, `||`, `|`), and writes only land in `/tmp/` and your `opencode-safe-test/` dir.
 
@@ -121,10 +133,11 @@ Only non-destructive commands. All writes go to `/tmp/opencode-safe-test/`.
 
 ```bash
 bash tests/run-safe-tests.sh          # shell: connectivity + reads + 8 blocks + safe zone
+bash tests/test-policy.sh             # danger-policy matrix (30 checks, executes nothing)
 node --experimental-strip-types tests/e2e-tools.mjs   # real E2E of the 7 TS tools over SSH
 ```
 
-Latest validation: **15/15** shell on LAN and Tailscale · **10/10** E2E · **10/10** safety guard. 🎯
+Latest validation: **15/15** shell on LAN and Tailscale · **30/30** policy · **11/11** E2E · **7/7** TS guard. 🎯
 
 ---
 
@@ -133,16 +146,18 @@ Latest validation: **15/15** shell on LAN and Tailscale · **10/10** E2E · **10
 ```
 .
 ├── bin/
-│   ├── ssh-remote-exec.sh   # safe SSH wrapper (blocklist + allowlist)
+│   ├── ssh-remote-exec.sh   # safe SSH wrapper (danger policy + allowlist + --check-only)
 │   └── install.sh           # idempotent, non-destructive installer
 ├── config/
-│   └── ssh-remote.conf.example  # template (the real one lives in .gitignore)
+│   └── ssh-remote.conf.example  # template incl. DANGER_* policy (real one lives in .gitignore)
 ├── tools/
-│   ├── lib.ts               # shared guard + SSH client (Bun.spawn)
+│   ├── lib.ts               # shared guard + policy + SSH client (Bun.spawn)
 │   └── remote_*.ts          # the 7 OpenCode tools
 ├── tests/
 │   ├── run-safe-tests.sh    # safe battery, 15 checks
+│   ├── test-policy.sh       # danger-policy matrix, 30 checks (runs nothing)
 │   └── e2e-tools.mjs        # tool E2E via Bun.spawn stub → real SSH
+├── instructions.md          # copy-paste prompt to send to your agent
 ├── opencode.jsonc.snippet   # 100%-remote-mode template
 └── README.md
 ```
@@ -155,7 +170,7 @@ Latest validation: **15/15** shell on LAN and Tailscale · **10/10** E2E · **10
 |---------|--------------|------------|
 | `Permission denied (publickey)` | Your key is missing on the server | `ssh-copy-id user@host` once |
 | Tailscale: `Connection timed out` | Flaky Tailscale network (ping OK doesn't guarantee SSH banner) | Retry; LAN works; try `ssh -o IPQoS=none` |
-| `SAFE_MODE` rejects your command | Read-only during testing | Split the command or set `SSH_REMOTE_SAFE_MODE=0` (blocklist stays on) |
+| `SAFE_MODE` rejects your command | Read-only during testing | Split the command or set `SSH_REMOTE_SAFE_MODE=0` (danger policy stays on per class) |
 | `oldString not found` in `remote_edit` | Text doesn't match exactly | Paste the exact block or use `replaceAll: true` |
 
 ---
