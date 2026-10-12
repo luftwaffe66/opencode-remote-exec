@@ -9,6 +9,7 @@ export default tool({
     oldString: tool.schema.string().describe("Exact text to replace"),
     newString: tool.schema.string().describe("Replacement text"),
     replaceAll: tool.schema.boolean().optional().describe("Replace all (default false)"),
+    server: tool.schema.string().optional().describe("Server from ssh-remote.env (omit = default server). Unknown names are rejected without executing."),
   },
   async execute(args) {
     assertSafeWritePath(args.filePath);
@@ -38,7 +39,7 @@ export default tool({
     ).toString("base64");
     const cmd = `python3 -c "import base64;exec(base64.b64decode('${pyB64}').decode())"`;
     try {
-      return await sshExec(cmd);
+      return await sshExec(cmd, undefined, args.server);
     } catch (e: any) {
       const m = String(e?.message ?? e);
       if (m.includes("exit 11")) throw new Error("oldString not found on remote");

@@ -7,6 +7,7 @@ export default tool({
   args: {
     filePath: tool.schema.string().describe("Remote destination path (safe zone while testing)"),
     content: tool.schema.string().describe("Full content to write"),
+    server: tool.schema.string().optional().describe("Server from ssh-remote.env (omit = default server). Unknown names are rejected without executing."),
   },
   async execute(args) {
     assertSafeWritePath(args.filePath);
@@ -15,6 +16,6 @@ export default tool({
     const cmd =
       `mkdir -p $(dirname ${q(args.filePath)}) && ` +
       `echo ${q(b64)} | base64 -d > ${q(args.filePath)} && wc -c ${q(args.filePath)}`;
-    return await sshExec(cmd);
+    return await sshExec(cmd, undefined, args.server);
   },
 });

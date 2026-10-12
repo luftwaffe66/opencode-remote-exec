@@ -7,11 +7,12 @@ export default tool({
     filePath: tool.schema.string().describe("Absolute remote path, e.g. /tmp/opencode-safe-test/hello.txt"),
     offset: tool.schema.number().optional().describe("First line (1-based) for paging"),
     limit: tool.schema.number().optional().describe("Max lines (default 2000)"),
+    server: tool.schema.string().optional().describe("Server from ssh-remote.env (omit = default server). Unknown names are rejected without executing."),
   },
   async execute(args) {
     const off = args.offset ?? 1;
     const lim = args.limit ?? 2000;
     // sed keeps huge files paged; read-only end to end.
-    return await sshExec(`sed -n '${off},${off + lim - 1}p' ${q(args.filePath)}`);
+    return await sshExec(`sed -n '${off},${off + lim - 1}p' ${q(args.filePath)}`, undefined, args.server);
   },
 });

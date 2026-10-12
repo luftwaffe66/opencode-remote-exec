@@ -6,13 +6,14 @@ export default tool({
   args: {
     pattern: tool.schema.string().describe("Regex/text to search"),
     path: tool.schema.string().optional().describe("Remote file or dir (default workspace)"),
+    server: tool.schema.string().optional().describe("Server from ssh-remote.env (omit = default server). Unknown names are rejected without executing."),
   },
   async execute(args) {
-    const p = args.path ?? remoteWorkspace();
+    const p = args.path ?? remoteWorkspace(args.server);
     const cmd =
       `(rg -n --no-heading ${q(args.pattern)} ${q(p)} 2>/dev/null || ` +
       `grep -rn ${q(args.pattern)} ${q(p)} 2>/dev/null) | head -n 100`;
-    const out = await sshExec(cmd);
+    const out = await sshExec(cmd, undefined, args.server);
     return out.trim() || "(no matches)";
   },
 });

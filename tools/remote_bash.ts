@@ -10,10 +10,12 @@ export default tool({
       .string()
       .optional()
       .describe("Remote working directory (default: your remote workspace)"),
+    server: tool.schema.string().optional().describe("Server from ssh-remote.env (omit = default server). Unknown names are rejected without executing."),
   },
   async execute(args) {
     assertSafeBash(args.command);
-    const out = await sshExec(args.command, args.workdir ?? remoteWorkspace());
+    const ws = args.workdir ?? remoteWorkspace(args.server);
+    const out = await sshExec(args.command, ws, args.server);
     return out.trimEnd() || "(no output)";
   },
 });

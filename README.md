@@ -178,3 +178,27 @@ Latest validation: **15/15** shell on LAN and Tailscale · **30/30** policy · *
 ## 📄 License
 
 [MIT](./LICENSE) — use it, fork it, share it. A ⭐ is appreciated if it helps you.
+
+## 🖥️ Multi-server (.env, sin reiniciar)
+
+Los tools leen `~/.config/opencode/ssh-remote.env` **en cada llamada** (chmod 600):
+
+```dotenv
+SSH_DEFAULT_SERVER=casa
+SSH_CASA_HOST=192.168.100.6
+SSH_CASA_PORT=22
+SSH_CASA_USER=server
+SSH_CASA_WORKSPACE=/home/server
+SSH_CASA_KEY_PATH=~/.ssh/id_ed25519
+SSH_FUERA_HOST=100.72.153.2
+SSH_FUERA_USER=server
+SSH_COMMAND_TIMEOUT=120
+```
+
+- `remote_bash(command="hostname", server="fuera")` ejecuta en ese servidor.
+- Sin `server` se usa `SSH_DEFAULT_SERVER`. Nombres desconocidos o
+  configuraciones incompletas **rechazan sin ejecutar** (fail-closed).
+- Sin archivo `.env`, todo funciona como antes (variables `SSH_REMOTE_HOST*`).
+- Prohibido: claves `*_PASSWORD` en el archivo (falla explícito). Solo llaves.
+- `SSH_COMMAND_TIMEOUT` mata el comando y reporta salida parcial (código 124
+  equivalente). Ver `config/ssh-remote.env.example` y `tests/test-config.mjs`.
